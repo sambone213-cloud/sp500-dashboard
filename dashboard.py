@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime
 
+# Load tickers
 def get_sp500_tickers():
     try:
         with open("sp500_tickers.txt", "r") as f:
@@ -13,10 +14,9 @@ def get_sp500_tickers():
         return []
 
 st.set_page_config(page_title="S&P 500 Dashboard", layout="wide")
-st.title("📈 S&P 500 Dashboard")
+st.title("📈 S&P 500 Dashboard (Historical Data)")
 
 tickers = get_sp500_tickers()
-
 selected = st.selectbox("Select a company:", tickers if tickers else ["None"])
 
 if selected != "None":
@@ -26,28 +26,23 @@ if selected != "None":
     st.subheader(selected)
 
     # ------------------------
-    # Fetch fast info (reliable)
+    # Fetch historical data (default 6 months)
     # ------------------------
     try:
-        fast = stock.fast_info  # fast_info avoids 403
-        st.metric("Current Price", f"${fast['last_price']:.2f}")
-        st.metric("Day High", f"${fast['day_high']:.2f}")
-        st.metric("Day Low", f"${fast['day_low']:.2f}")
-        st.metric("Open", f"${fast['open']:.2f}")
-        st.metric("Previous Close", f"${fast['previous_close']:.2f}")
-        st.metric("Market Cap", f"${fast['market_cap']:,}")
-    except Exception as e:
-        st.warning(f"Could not fetch fast info: {e}")
-
-    # ------------------------
-    # Historical chart (fallback)
-    # ------------------------
-    try:
-        hist = stock.history(period="5d", interval="1h")  # 5 days, hourly
+        hist = stock.history(period="6mo", interval="1d")  # 6 months daily
         if not hist.empty:
+            st.write("### Historical Prices")
+            st.dataframe(hist.tail(10))  # Show last 10 rows
             st.line_chart(hist['Close'])
+            
+            # Summary metrics
+            st.write("### Summary Metrics")
+            st.metric("Start Price (6mo ago)", f"${hist['Close'].iloc[0]:.2f}")
+            st.metric("Current Price", f"${hist['Close'].iloc[-1]:.2f}")
+            st.metric("High (6mo)", f"${hist['High'].max():.2f}")
+            st.metric("Low (6mo)", f"${hist['Low'].min():.2f}")
         else:
-            st.info("No historical chart available.")
+            st.info("No historical data available.")
     except Exception as e:
         st.warning(f"Could not fetch historical data: {e}")
 
