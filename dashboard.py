@@ -20,34 +20,32 @@ tickers = get_sp500_tickers()
 selected = st.selectbox("Select a company:", tickers if tickers else ["None"])
 
 if selected != "None":
-    ticker_symbol = selected.split("(")[-1].replace(")", "")
-    stock = yf.Ticker(ticker_symbol)
-
-    st.subheader(selected)
-
-    # ------------------------
-    # Fetch historical data (default 6 months)
-    # ------------------------
+    # Extract ticker cleanly
     try:
-        hist = stock.history(period="6mo", interval="1d")  # 6 months daily
-        if not hist.empty:
-            st.write("### Historical Prices")
-            st.dataframe(hist.tail(10))  # Show last 10 rows
-            st.line_chart(hist['Close'])
-            
-            # Summary metrics
-            st.write("### Summary Metrics")
-            st.metric("Start Price (6mo ago)", f"${hist['Close'].iloc[0]:.2f}")
-            st.metric("Current Price", f"${hist['Close'].iloc[-1]:.2f}")
-            st.metric("High (6mo)", f"${hist['High'].max():.2f}")
-            st.metric("Low (6mo)", f"${hist['Low'].min():.2f}")
+        ticker_symbol = selected.split("(")[-1].replace(")", "").strip()
+        st.write(f"Ticker symbol: {ticker_symbol}")
+        stock = yf.Ticker(ticker_symbol)
+
+        # Fetch historical data (1 year daily)
+        hist = stock.history(period="1y", interval="1d")
+        if hist.empty:
+            st.warning("No historical data available for this ticker.")
         else:
-            st.info("No historical data available.")
+            st.subheader(selected)
+            st.write("### Last 10 Days of Historical Prices")
+            st.dataframe(hist.tail(10))
+            st.line_chart(hist['Close'])
+
+            # Summary metrics
+            st.write("### Summary Metrics (1 Year)")
+            st.metric("Start Price (1y ago)", f"${hist['Close'].iloc[0]:.2f}")
+            st.metric("Current Price", f"${hist['Close'].iloc[-1]:.2f}")
+            st.metric("High (1y)", f"${hist['High'].max():.2f}")
+            st.metric("Low (1y)", f"${hist['Low'].min():.2f}")
+
+        st.write(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     except Exception as e:
-        st.warning(f"Could not fetch historical data: {e}")
-
-    st.write(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
+        st.error(f"Error fetching data: {e}")
 
 
 
