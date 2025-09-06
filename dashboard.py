@@ -41,3 +41,13 @@ selected_ticker = st.selectbox("Select a ticker", tickers if tickers else ["None
 
 if selected_ticker != "None":
     st.write(f"You selected: {selected_ticker}")
+    import yfinance as yf
+
+if selected_ticker != "None":
+    ticker_symbol = selected_ticker.split("(")[-1].replace(")", "")
+    stock = yf.Ticker(ticker_symbol)
+    st.write(stock.info['shortName'])
+    st.write(f"Current Price: ${stock.info['currentPrice']}")
+    st.line_chart(stock.history(period="1mo")['Close'])
+
+
