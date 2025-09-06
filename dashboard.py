@@ -1,53 +1,73 @@
 import streamlit as st
+import yfinance as yf
+import pandas as pd
 
 # -----------------------
-# Function to load tickers from a local file
-# Format in file: Company Name (TICKER)
+# Load S&P 500 tickers from a local file
+# Format in the file: Company Name (TICKER)
 # -----------------------
-def get_sp500_tickers():
+def get_sp500_tickers(file_path="sp500_tickers.txt"):
     try:
-        with open("sp500_tickers.txt", "r") as f:
-            tickers = []
-            for line in f:
-                line = line.strip()
-                if line:
-                    # Extract ticker from parentheses
-                    if "(" in line and ")" in line:
-                        ticker = line.split("(")[-1].replace(")", "").strip()
-                        name = line.split("(")[0].strip()
-                        tickers.append(f"{name} ({ticker})")
-                    else:
-                        tickers.append(line)
+        with open(file_path, "r") as f:
+            tickers = [line.strip() for line in f if line.strip()]
         return tickers
     except Exception as e:
         st.error(f"Error loading tickers: {e}")
         return []
 
 # -----------------------
-# Streamlit App
+# Streamlit App Setup
 # -----------------------
 st.set_page_config(page_title="S&P 500 Dashboard", layout="wide")
-st.title("S&P 500 Dashboard")
+st.title("📈 S&P 500 Dashboard")
 
+# Load tickers
 tickers = get_sp500_tickers()
 
 if tickers:
     st.success(f"Loaded {len(tickers)} tickers!")
-    st.write(tickers[:20])  # Show first 20 tickers
 else:
     st.warning("No tickers loaded.")
 
-selected_ticker = st.selectbox("Select a ticker", tickers if tickers else ["None"])
+# -----------------------
+# Ticker Selection
+# -----------------------
+selected_ticker = st.selectbox(
+    "Select a company:",
+    options=tickers,
+    index=0,
+    help="Search by company name or ticker"
+)
 
-if selected_ticker != "None":
-    st.write(f"You selected: {selected_ticker}")
-    import yfinance as yf
-
-if selected_ticker != "None":
+# -----------------------
+# Display Stock Info
+# -----------------------
+if selected_ticker and selected_ticker != "None":
     ticker_symbol = selected_ticker.split("(")[-1].replace(")", "")
     stock = yf.Ticker(ticker_symbol)
-    st.write(stock.info['shortName'])
-    st.write(f"Current Price: ${stock.info['currentPrice']}")
-    st.line_chart(stock.history(period="1mo")['Close'])
+    info = stock.info
+
+    # Metrics row
+    st.subheader(f"{info.get('shortName', selected_ticker)} ({ticker_symbol})")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Current Price", f"${info.get('currentPrice', 'N/A')}")
+    col2.metric("Day Change", f"{info.get('dayChange', 'N/A')}")
+    col3.metric("Market Cap", f"${info.get('marketCap', 'N/A'):,}")
+    col4.metric("PE Ratio", f"{info.get('trailingPE', 'N/A')}")
+
+    # Stock History Chart
+    st.subheader("📊 Price Chart (1 Month)")
+    hist = stock.history(period="1mo")
+    st.line_chart(hist['Close'])
+
+    # Additional Info
+    st.subheader("Company Info")
+    st.write({
+        "Sector": info.get('sector', 'N/A'),
+        "Industry": info.get('industry', 'N/A'),
+        "Website": info.get('website', 'N/A'),
+        "Description": info.get('longBusinessSummary', 'N/A')
+    })
+
 
 
