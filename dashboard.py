@@ -65,5 +65,7 @@ if selected != "None":
         hist.columns = hist.columns.get_level_values(0)
 
         if hist.empty:
-            st.warning("No historical data available for this
+        st.warning("No historical data available for this ticker.")
+
+
 
