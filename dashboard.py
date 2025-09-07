@@ -41,114 +41,150 @@ def calculate_bollinger_bands(data, window=20, num_std=2):
     data["BB_Lower"] = rolling_mean - (rolling_std * num_std)
     return data
 
+def get_confluence_levels(hist, show_ma=True, show_bb=True):
+    levels = []
+    if show_ma:
+        levels += [hist["MA20"].iloc[-1], hist["MA50"].iloc[-1]]
+    if show_bb:
+        levels += [hist["BB_Upper"].iloc[-1], hist["BB_Lower"].iloc[-1]]
+    # Recent high/low
+    levels += [hist['Close'].max(), hist['Close'].min()]
+    # Remove duplicates and round
+    levels = sorted(list(set([round(x, 2) for x in levels])))
+    return levels
+
 # -----------------------
 # Streamlit App
 # -----------------------
-st.set_page_config(page_title="S&P 500 Dashboard (Interactive)", layout="wide")
-st.title("📈 S&P 500 Interactive Dashboard (Yahoo Finance)")
+st.set_page_config(page_title="S&P 500 Interactive Dashboard", layout="wide")
+st.sidebar.title("Navigation")
+page = st.sidebar.radio("Go to:", ["Dashboard", "Info"])
 
-tickers = get_sp500_tickers()
-selected = st.selectbox("Select a company:", tickers if tickers else ["None"])
+if page == "Info":
+    st.title("ℹ️ Dashboard Information")
+    st.markdown("""
+    **This dashboard includes the following tools and indicators:**
 
-if selected != "None":
-    try:
-        ticker_symbol = selected.split("(")[-1].replace(")", "").strip()
+    - **Moving Averages (MA20 & MA50):** Track short- and medium-term trends.
+    - **Bollinger Bands:** Measure volatility; price outside bands may indicate overbought/oversold.
+    - **RSI (Relative Strength Index):** Momentum indicator; RSI > 70 = overbought, < 30 = oversold.
+    - **MACD (12,26,9):** Trend-following momentum indicator; crossovers signal buy/sell.
+    - **Volume:** Number of shares traded; spikes can indicate strong moves.
+    - **Confluence Levels:** Price levels where multiple indicators (MA, BB, highs/lows) align.
+    - **CSV Download:** Export historical data for further analysis.
+    """)
 
-        # Date range picker
-        col1, col2 = st.columns(2)
-        with col1:
-            start_date = st.date_input("Start date", datetime.now() - timedelta(days=365))
-        with col2:
-            end_date = st.date_input("End date", datetime.now())
+else:  # Dashboard
+    st.title("📈 S&P 500 Interactive Dashboard")
 
-        st.write(f"Fetching historical data for: {ticker_symbol}")
+    tickers = get_sp500_tickers()
+    selected = st.selectbox("Select a company:", tickers if tickers else ["None"])
 
-        # Fetch historical data
-        hist = yf.download(ticker_symbol, start=start_date, end=end_date)
-        hist = hist.dropna()
-        hist.columns = hist.columns.get_level_values(0)
+    if selected != "None":
+        try:
+            ticker_symbol = selected.split("(")[-1].replace(")", "").strip()
 
-        if hist.empty:
-            st.warning("No historical data available for this ticker.")
-        else:
-            st.subheader(selected)
-            st.write("### Last 10 Days of Historical Prices")
-            st.dataframe(hist.tail(10))
+            # Date range picker
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input("Start date", datetime.now() - timedelta(days=365))
+            with col2:
+                end_date = st.date_input("End date", datetime.now())
 
-            # Sidebar: select indicators
-            st.sidebar.header("Chart Options")
-            show_ma = st.sidebar.checkbox("Show Moving Averages (MA20 & MA50)", value=True)
-            show_bb = st.sidebar.checkbox("Show Bollinger Bands", value=True)
-            show_rsi = st.sidebar.checkbox("Show RSI", value=True)
-            show_macd = st.sidebar.checkbox("Show MACD", value=True)
-            show_volume = st.sidebar.checkbox("Show Volume", value=True)
+            st.write(f"Fetching historical data for: {ticker_symbol}")
 
-            # Calculate indicators
-            if show_ma:
-                hist["MA20"] = hist["Close"].rolling(window=20).mean()
-                hist["MA50"] = hist["Close"].rolling(window=50).mean()
-            if show_bb:
-                hist = calculate_bollinger_bands(hist)
-            if show_rsi:
-                hist = calculate_rsi(hist)
-            if show_macd:
-                hist = calculate_macd(hist)
+            # Fetch historical data
+            hist = yf.download(ticker_symbol, start=start_date, end=end_date)
+            hist = hist.dropna()
+            hist.columns = hist.columns.get_level_values(0)
 
-            # Price chart with optional indicators
-            st.write("### Price Chart")
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=hist.index, y=hist["Close"], mode="lines", name="Close"))
+            if hist.empty:
+                st.warning("No historical data available for this ticker.")
+            else:
+                st.subheader(selected)
+                st.write("### Last 10 Days of Historical Prices")
+                st.dataframe(hist.tail(10))
 
-            if show_ma:
-                fig.add_trace(go.Scatter(x=hist.index, y=hist["MA20"], mode="lines", name="MA20"))
-                fig.add_trace(go.Scatter(x=hist.index, y=hist["MA50"], mode="lines", name="MA50"))
-            if show_bb:
-                fig.add_trace(go.Scatter(x=hist.index, y=hist["BB_Upper"], mode="lines", name="BB Upper", line=dict(dash="dash")))
-                fig.add_trace(go.Scatter(x=hist.index, y=hist["BB_Lower"], mode="lines", name="BB Lower", line=dict(dash="dash")))
+                # Sidebar: select indicators
+                st.sidebar.header("Chart Options")
+                show_ma = st.sidebar.checkbox("Show Moving Averages (MA20 & MA50)", value=True)
+                show_bb = st.sidebar.checkbox("Show Bollinger Bands", value=True)
+                show_rsi = st.sidebar.checkbox("Show RSI", value=True)
+                show_macd = st.sidebar.checkbox("Show MACD", value=True)
+                show_volume = st.sidebar.checkbox("Show Volume", value=True)
+                show_confluence = st.sidebar.checkbox("Show Confluence Levels", value=True)
 
-            st.plotly_chart(fig, use_container_width=True)
+                # Calculate indicators
+                if show_ma:
+                    hist["MA20"] = hist["Close"].rolling(window=20).mean()
+                    hist["MA50"] = hist["Close"].rolling(window=50).mean()
+                if show_bb:
+                    hist = calculate_bollinger_bands(hist)
+                if show_rsi:
+                    hist = calculate_rsi(hist)
+                if show_macd:
+                    hist = calculate_macd(hist)
+                if show_confluence:
+                    confluence_levels = get_confluence_levels(hist, show_ma, show_bb)
 
-            # Volume chart
-            if show_volume:
-                st.write("### Volume")
-                fig_vol = go.Figure()
-                fig_vol.add_trace(go.Bar(x=hist.index, y=hist["Volume"], name="Volume"))
-                st.plotly_chart(fig_vol, use_container_width=True)
+                # Price chart
+                st.write("### Price Chart")
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=hist.index, y=hist["Close"], mode="lines", name="Close"))
 
-            # RSI chart
-            if show_rsi:
-                st.write("### RSI")
-                fig_rsi = go.Figure()
-                fig_rsi.add_trace(go.Scatter(x=hist.index, y=hist["RSI"], mode="lines", name="RSI"))
-                fig_rsi.add_hline(y=70, line_dash="dash", line_color="red")
-                fig_rsi.add_hline(y=30, line_dash="dash", line_color="green")
-                st.plotly_chart(fig_rsi, use_container_width=True)
+                if show_ma:
+                    fig.add_trace(go.Scatter(x=hist.index, y=hist["MA20"], mode="lines", name="MA20"))
+                    fig.add_trace(go.Scatter(x=hist.index, y=hist["MA50"], mode="lines", name="MA50"))
+                if show_bb:
+                    fig.add_trace(go.Scatter(x=hist.index, y=hist["BB_Upper"], mode="lines", name="BB Upper", line=dict(dash="dash")))
+                    fig.add_trace(go.Scatter(x=hist.index, y=hist["BB_Lower"], mode="lines", name="BB Lower", line=dict(dash="dash")))
+                if show_confluence:
+                    for level in confluence_levels:
+                        fig.add_hline(y=level, line_dash="dot", line_color="purple", annotation_text=f"Confluence: {level}", annotation_position="top right")
 
-            # MACD chart
-            if show_macd:
-                st.write("### MACD")
-                fig_macd = go.Figure()
-                fig_macd.add_trace(go.Scatter(x=hist.index, y=hist["MACD"], mode="lines", name="MACD"))
-                fig_macd.add_trace(go.Scatter(x=hist.index, y=hist["Signal"], mode="lines", name="Signal"))
-                st.plotly_chart(fig_macd, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True)
 
-            # Summary Metrics
-            st.write("### Summary Metrics")
-            st.metric("Start Price", f"${hist['Close'].iloc[0]:.2f}")
-            st.metric("Current Price", f"${hist['Close'].iloc[-1]:.2f}")
-            st.metric("High", f"${hist['High'].max():.2f}")
-            st.metric("Low", f"${hist['Low'].min():.2f}")
+                # Volume chart
+                if show_volume:
+                    st.write("### Volume")
+                    fig_vol = go.Figure()
+                    fig_vol.add_trace(go.Bar(x=hist.index, y=hist["Volume"], name="Volume"))
+                    st.plotly_chart(fig_vol, use_container_width=True)
 
-            # Download CSV
-            csv = hist.to_csv().encode("utf-8")
-            st.download_button(
-                label="⬇️ Download data as CSV",
-                data=csv,
-                file_name=f"{ticker_symbol}_historical.csv",
-                mime="text/csv",
-            )
+                # RSI chart
+                if show_rsi:
+                    st.write("### RSI")
+                    fig_rsi = go.Figure()
+                    fig_rsi.add_trace(go.Scatter(x=hist.index, y=hist["RSI"], mode="lines", name="RSI"))
+                    fig_rsi.add_hline(y=70, line_dash="dash", line_color="red")
+                    fig_rsi.add_hline(y=30, line_dash="dash", line_color="green")
+                    st.plotly_chart(fig_rsi, use_container_width=True)
 
-        st.write(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                # MACD chart
+                if show_macd:
+                    st.write("### MACD")
+                    fig_macd = go.Figure()
+                    fig_macd.add_trace(go.Scatter(x=hist.index, y=hist["MACD"], mode="lines", name="MACD"))
+                    fig_macd.add_trace(go.Scatter(x=hist.index, y=hist["Signal"], mode="lines", name="Signal"))
+                    st.plotly_chart(fig_macd, use_container_width=True)
 
-    except Exception as e:
-        st.error(f"Error fetching data: {e}")
+                # Summary Metrics
+                st.write("### Summary Metrics")
+                st.metric("Start Price", f"${hist['Close'].iloc[0]:.2f}")
+                st.metric("Current Price", f"${hist['Close'].iloc[-1]:.2f}")
+                st.metric("High", f"${hist['High'].max():.2f}")
+                st.metric("Low", f"${hist['Low'].min():.2f}")
+
+                # Download CSV
+                csv = hist.to_csv().encode("utf-8")
+                st.download_button(
+                    label="⬇️ Download data as CSV",
+                    data=csv,
+                    file_name=f"{ticker_symbol}_historical.csv",
+                    mime="text/csv",
+                )
+
+            st.write(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+        except Exception as e:
+            st.error(f"Error fetching data: {e}")
