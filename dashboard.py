@@ -33,6 +33,13 @@ def calculate_macd(data, short=12, long=26, signal=9):
     data["Signal"] = data["MACD"].ewm(span=signal, adjust=False).mean()
     return data
 
+def calculate_bollinger_bands(data, window=20, num_std=2):
+    rolling_mean = data["Close"].rolling(window=window).mean()
+    rolling_std = data["Close"].rolling(window=window).std()
+    data["BB_Upper"] = rolling_mean + (rolling_std * num_std)
+    data["BB_Lower"] = rolling_mean - (rolling_std * num_std)
+    return data
+
 # -----------------------
 # Streamlit App
 # -----------------------
@@ -44,10 +51,9 @@ selected = st.selectbox("Select a company:", tickers if tickers else ["None"])
 
 if selected != "None":
     try:
-        # Extract ticker symbol (the part in parentheses, e.g., "AAPL")
         ticker_symbol = selected.split("(")[-1].replace(")", "").strip()
 
-        # Date range picker (default: last 1 year)
+        # Date range picker
         col1, col2 = st.columns(2)
         with col1:
             start_date = st.date_input("Start date", datetime.now() - timedelta(days=365))
@@ -56,30 +62,29 @@ if selected != "None":
 
         st.write(f"Fetching historical data for: {ticker_symbol}")
 
-        # Fetch historical data from Yahoo Finance
+        # Download historical data
         hist = yf.download(ticker_symbol, start=start_date, end=end_date)
         hist = hist.dropna()
-
-        # Flatten columns in case yfinance returns MultiIndex
-        hist.columns = hist.columns.get_level_values(0)
+        hist.columns = hist.columns.get_level_values(0)  # Flatten columns
 
         if hist.empty:
             st.warning("No historical data available for this ticker.")
         else:
-            # Subheader
             st.subheader(selected)
-
-            # Show last 10 rows
             st.write("### Last 10 Days of Historical Prices")
             st.dataframe(hist.tail(10))
 
-            # Add Moving Averages
+            # Moving Averages
             hist["MA20"] = hist["Close"].rolling(window=20).mean()
             hist["MA50"] = hist["Close"].rolling(window=50).mean()
-            ma_df = hist[["Close", "MA20", "MA50"]]
 
-            st.write("### Closing Price with Moving Averages")
-            st.line_chart(ma_df)
+            # Bollinger Bands
+            hist = calculate_bollinger_bands(hist)
+
+            # Closing Price + MAs + Bollinger Bands chart
+            st.write("### Closing Price with Moving Averages & Bollinger Bands")
+            bb_df = hist[["Close", "MA20", "MA50", "BB_Upper", "BB_Lower"]]
+            st.line_chart(bb_df)
 
             # Volume chart
             st.write("### Trading Volume")
@@ -95,14 +100,14 @@ if selected != "None":
             st.write("### MACD (12, 26, 9)")
             st.line_chart(hist[["MACD", "Signal"]])
 
-            # Summary metrics
+            # Summary Metrics
             st.write("### Summary Metrics")
             st.metric("Start Price", f"${hist['Close'].iloc[0]:.2f}")
             st.metric("Current Price", f"${hist['Close'].iloc[-1]:.2f}")
             st.metric("High", f"${hist['High'].max():.2f}")
             st.metric("Low", f"${hist['Low'].min():.2f}")
 
-            # Download button
+            # Download CSV
             csv = hist.to_csv().encode("utf-8")
             st.download_button(
                 label="⬇️ Download data as CSV",
