@@ -58,4 +58,60 @@ if selected != "None":
 
         # Fetch historical data from Yahoo Finance
         hist = yf.download(ticker_symbol, start=start_date, end=end_date)
-        hist
+        hist = hist.dropna()
+
+        # Flatten columns in case yfinance returns MultiIndex
+        hist.columns = hist.columns.get_level_values(0)
+
+        if hist.empty:
+            st.warning("No historical data available for this ticker.")
+        else:
+            # Subheader
+            st.subheader(selected)
+
+            # Show last 10 rows
+            st.write("### Last 10 Days of Historical Prices")
+            st.dataframe(hist.tail(10))
+
+            # Add Moving Averages
+            hist["MA20"] = hist["Close"].rolling(window=20).mean()
+            hist["MA50"] = hist["Close"].rolling(window=50).mean()
+            ma_df = hist[["Close", "MA20", "MA50"]]
+
+            st.write("### Closing Price with Moving Averages")
+            st.line_chart(ma_df)
+
+            # Volume chart
+            st.write("### Trading Volume")
+            st.bar_chart(hist["Volume"])
+
+            # RSI
+            hist = calculate_rsi(hist)
+            st.write("### Relative Strength Index (RSI)")
+            st.line_chart(hist["RSI"])
+
+            # MACD
+            hist = calculate_macd(hist)
+            st.write("### MACD (12, 26, 9)")
+            st.line_chart(hist[["MACD", "Signal"]])
+
+            # Summary metrics
+            st.write("### Summary Metrics")
+            st.metric("Start Price", f"${hist['Close'].iloc[0]:.2f}")
+            st.metric("Current Price", f"${hist['Close'].iloc[-1]:.2f}")
+            st.metric("High", f"${hist['High'].max():.2f}")
+            st.metric("Low", f"${hist['Low'].min():.2f}")
+
+            # Download button
+            csv = hist.to_csv().encode("utf-8")
+            st.download_button(
+                label="⬇️ Download data as CSV",
+                data=csv,
+                file_name=f"{ticker_symbol}_historical.csv",
+                mime="text/csv",
+            )
+
+        st.write(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    except Exception as e:
+        st.error(f"Error fetching data: {e}")
