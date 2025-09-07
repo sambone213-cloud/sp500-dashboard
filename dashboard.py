@@ -23,8 +23,7 @@ def calculate_rsi(data, window=14):
     gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
     rs = gain / loss
-    rsi = 100 - (100 / (1 + rs))
-    data["RSI"] = rsi
+    data["RSI"] = 100 - (100 / (1 + rs))
     return data
 
 def calculate_macd(data, short=12, long=26, signal=9):
@@ -59,13 +58,4 @@ if selected != "None":
 
         # Fetch historical data from Yahoo Finance
         hist = yf.download(ticker_symbol, start=start_date, end=end_date)
-        hist = hist.dropna()
-
-        # Flatten columns in case yfinance returns MultiIndex
-        hist.columns = hist.columns.get_level_values(0)
-
-        if hist.empty:
-        st.warning("No historical data available for this ticker.")
-
-
-
+        hist
