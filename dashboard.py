@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import yfinance as yf
+import plotly.graph_objects as go
 
 # -----------------------
 # Load tickers
@@ -43,8 +44,8 @@ def calculate_bollinger_bands(data, window=20, num_std=2):
 # -----------------------
 # Streamlit App
 # -----------------------
-st.set_page_config(page_title="S&P 500 Dashboard (Yahoo Finance)", layout="wide")
-st.title("📈 S&P 500 Dashboard (Yahoo Finance Data)")
+st.set_page_config(page_title="S&P 500 Dashboard (Interactive)", layout="wide")
+st.title("📈 S&P 500 Interactive Dashboard (Yahoo Finance)")
 
 tickers = get_sp500_tickers()
 selected = st.selectbox("Select a company:", tickers if tickers else ["None"])
@@ -62,10 +63,10 @@ if selected != "None":
 
         st.write(f"Fetching historical data for: {ticker_symbol}")
 
-        # Download historical data
+        # Fetch historical data
         hist = yf.download(ticker_symbol, start=start_date, end=end_date)
         hist = hist.dropna()
-        hist.columns = hist.columns.get_level_values(0)  # Flatten columns
+        hist.columns = hist.columns.get_level_values(0)
 
         if hist.empty:
             st.warning("No historical data available for this ticker.")
@@ -74,31 +75,62 @@ if selected != "None":
             st.write("### Last 10 Days of Historical Prices")
             st.dataframe(hist.tail(10))
 
-            # Moving Averages
-            hist["MA20"] = hist["Close"].rolling(window=20).mean()
-            hist["MA50"] = hist["Close"].rolling(window=50).mean()
+            # Sidebar: select indicators
+            st.sidebar.header("Chart Options")
+            show_ma = st.sidebar.checkbox("Show Moving Averages (MA20 & MA50)", value=True)
+            show_bb = st.sidebar.checkbox("Show Bollinger Bands", value=True)
+            show_rsi = st.sidebar.checkbox("Show RSI", value=True)
+            show_macd = st.sidebar.checkbox("Show MACD", value=True)
+            show_volume = st.sidebar.checkbox("Show Volume", value=True)
 
-            # Bollinger Bands
-            hist = calculate_bollinger_bands(hist)
+            # Calculate indicators
+            if show_ma:
+                hist["MA20"] = hist["Close"].rolling(window=20).mean()
+                hist["MA50"] = hist["Close"].rolling(window=50).mean()
+            if show_bb:
+                hist = calculate_bollinger_bands(hist)
+            if show_rsi:
+                hist = calculate_rsi(hist)
+            if show_macd:
+                hist = calculate_macd(hist)
 
-            # Closing Price + MAs + Bollinger Bands chart
-            st.write("### Closing Price with Moving Averages & Bollinger Bands")
-            bb_df = hist[["Close", "MA20", "MA50", "BB_Upper", "BB_Lower"]]
-            st.line_chart(bb_df)
+            # Price chart with optional indicators
+            st.write("### Price Chart")
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=hist.index, y=hist["Close"], mode="lines", name="Close"))
+
+            if show_ma:
+                fig.add_trace(go.Scatter(x=hist.index, y=hist["MA20"], mode="lines", name="MA20"))
+                fig.add_trace(go.Scatter(x=hist.index, y=hist["MA50"], mode="lines", name="MA50"))
+            if show_bb:
+                fig.add_trace(go.Scatter(x=hist.index, y=hist["BB_Upper"], mode="lines", name="BB Upper", line=dict(dash="dash")))
+                fig.add_trace(go.Scatter(x=hist.index, y=hist["BB_Lower"], mode="lines", name="BB Lower", line=dict(dash="dash")))
+
+            st.plotly_chart(fig, use_container_width=True)
 
             # Volume chart
-            st.write("### Trading Volume")
-            st.bar_chart(hist["Volume"])
+            if show_volume:
+                st.write("### Volume")
+                fig_vol = go.Figure()
+                fig_vol.add_trace(go.Bar(x=hist.index, y=hist["Volume"], name="Volume"))
+                st.plotly_chart(fig_vol, use_container_width=True)
 
-            # RSI
-            hist = calculate_rsi(hist)
-            st.write("### Relative Strength Index (RSI)")
-            st.line_chart(hist["RSI"])
+            # RSI chart
+            if show_rsi:
+                st.write("### RSI")
+                fig_rsi = go.Figure()
+                fig_rsi.add_trace(go.Scatter(x=hist.index, y=hist["RSI"], mode="lines", name="RSI"))
+                fig_rsi.add_hline(y=70, line_dash="dash", line_color="red")
+                fig_rsi.add_hline(y=30, line_dash="dash", line_color="green")
+                st.plotly_chart(fig_rsi, use_container_width=True)
 
-            # MACD
-            hist = calculate_macd(hist)
-            st.write("### MACD (12, 26, 9)")
-            st.line_chart(hist[["MACD", "Signal"]])
+            # MACD chart
+            if show_macd:
+                st.write("### MACD")
+                fig_macd = go.Figure()
+                fig_macd.add_trace(go.Scatter(x=hist.index, y=hist["MACD"], mode="lines", name="MACD"))
+                fig_macd.add_trace(go.Scatter(x=hist.index, y=hist["Signal"], mode="lines", name="Signal"))
+                st.plotly_chart(fig_macd, use_container_width=True)
 
             # Summary Metrics
             st.write("### Summary Metrics")
