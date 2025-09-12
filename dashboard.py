@@ -179,25 +179,64 @@ else:
                 if show_confluence:
                     confluence_levels = get_confluence_levels(filtered_hist, show_ma, show_bb)
 
-                # ------------------- Price Chart -------------------
+                # ------------------- Price Chart (Single-Day Compatible) -------------------
                 st.write("### Price Chart with Indicators")
                 fig = go.Figure()
-                fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["Close"], mode="lines", name="Close"))
+
+                # Close price
+                fig.add_trace(go.Scatter(
+                    x=filtered_hist.index,
+                    y=filtered_hist["Close"],
+                    mode="lines+markers" if len(filtered_hist) > 1 else "markers",
+                    name="Close",
+                    marker=dict(size=8)
+                ))
+
+                # Moving Averages
                 if show_ma:
-                    fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MA20"], mode="lines", name="MA20"))
-                    fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MA50"], mode="lines", name="MA50"))
+                    if len(filtered_hist) > 1:
+                        fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MA20"], mode="lines", name="MA20"))
+                        fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MA50"], mode="lines", name="MA50"))
+                    else:
+                        if not pd.isna(filtered_hist["MA20"].iloc[0]):
+                            fig.add_trace(go.Scatter(
+                                x=filtered_hist.index,
+                                y=filtered_hist["MA20"],
+                                mode="markers",
+                                name="MA20",
+                                marker=dict(size=10, color="orange")
+                            ))
+                        if not pd.isna(filtered_hist["MA50"].iloc[0]):
+                            fig.add_trace(go.Scatter(
+                                x=filtered_hist.index,
+                                y=filtered_hist["MA50"],
+                                mode="markers",
+                                name="MA50",
+                                marker=dict(size=10, color="green")
+                            ))
+
+                # Bollinger Bands
                 if show_bb:
-                    fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["BB_Upper"], mode="lines", name="BB Upper", line=dict(dash="dash")))
-                    fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["BB_Lower"], mode="lines", name="BB Lower", line=dict(dash="dash")))
+                    if len(filtered_hist) > 1:
+                        fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["BB_Upper"], mode="lines", name="BB Upper", line=dict(dash="dash")))
+                        fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["BB_Lower"], mode="lines", name="BB Lower", line=dict(dash="dash")))
+                    else:
+                        if not pd.isna(filtered_hist["BB_Upper"].iloc[0]):
+                            fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["BB_Upper"], mode="markers", name="BB Upper", marker=dict(size=10, color="red")))
+                        if not pd.isna(filtered_hist["BB_Lower"].iloc[0]):
+                            fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["BB_Lower"], mode="markers", name="BB Lower", marker=dict(size=10, color="purple")))
+
+                # Confluence levels
                 if show_confluence:
                     for level in confluence_levels:
                         fig.add_hline(y=level, line_dash="dot", line_color="purple", annotation_text=f"Confluence: {level}", annotation_position="top right")
+
                 st.plotly_chart(fig, use_container_width=True)
                 st.markdown("""
                 **Chart Description:**  
-                - **Day Trading:** Watch breakouts above/below Bollinger Bands.  
-                - **Swing Trading:** Use MA20/MA50 bounces and crossovers.  
-                - **Value Investing:** Consider long-term trends and confluence levels.  
+                - Works for both multi-day and single-day selections.  
+                - Single-day shows markers for Close, MA20, MA50, and Bollinger Bands.  
+                - Useful for day trading or analyzing a specific day's price behavior.
                 """)
 
                 # ------------------- Volume Chart -------------------
@@ -241,60 +280,6 @@ else:
                     - **Swing Trading:** Confirms medium-term trends; divergence signals reversal.  
                     - **Value Investing:** Trend direction aids long-term buy/sell decisions.
                     """)
-
-                # ------------------- Single-Day Price Chart -------------------
-                st.write("### Single-Day Price Chart")
-                if len(filtered_hist) == 1:
-                    single_day_fig = go.Figure()
-                    single_day_fig.add_trace(go.Scatter(
-                        x=filtered_hist.index,
-                        y=filtered_hist["Close"],
-                        mode="markers+lines",
-                        name="Close",
-                        marker=dict(size=10, color="blue")
-                    ))
-                    if show_ma:
-                        if not pd.isna(filtered_hist["MA20"].iloc[0]):
-                            single_day_fig.add_trace(go.Scatter(
-                                x=filtered_hist.index,
-                                y=filtered_hist["MA20"],
-                                mode="markers",
-                                name="MA20",
-                                marker=dict(size=8, color="orange")
-                            ))
-                        if not pd.isna(filtered_hist["MA50"].iloc[0]):
-                            single_day_fig.add_trace(go.Scatter(
-                                x=filtered_hist.index,
-                                y=filtered_hist["MA50"],
-                                mode="markers",
-                                name="MA50",
-                                marker=dict(size=8, color="green")
-                            ))
-                    if show_bb:
-                        if not pd.isna(filtered_hist["BB_Upper"].iloc[0]):
-                            single_day_fig.add_trace(go.Scatter(
-                                x=filtered_hist.index,
-                                y=filtered_hist["BB_Upper"],
-                                mode="markers",
-                                name="BB Upper",
-                                marker=dict(size=8, color="red")
-                            ))
-                        if not pd.isna(filtered_hist["BB_Lower"].iloc[0]):
-                            single_day_fig.add_trace(go.Scatter(
-                                x=filtered_hist.index,
-                                y=filtered_hist["BB_Lower"],
-                                mode="markers",
-                                name="BB Lower",
-                                marker=dict(size=8, color="purple")
-                            ))
-                    st.plotly_chart(single_day_fig, use_container_width=True)
-                    st.markdown("""
-                    **Chart Description:**  
-                    - Displays a single day's trading data.  
-                    - Useful for analyzing short intraday moves or confirming indicator alignment on a specific day.
-                    """)
-                else:
-                    st.info("Single-Day Price Chart only appears when the filtered data contains exactly one day.")
 
                 # ------------------- Summary Metrics -------------------
                 st.write("### Summary Metrics")
