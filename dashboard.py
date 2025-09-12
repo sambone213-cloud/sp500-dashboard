@@ -108,7 +108,12 @@ if page == "Info":
     - **Signals & Tips:**  
         - Price reaction likely near these levels; more indicators agreeing → stronger level.  
 
-    ### **7. CSV Download**
+    ### **7. One Data Point View**
+    - **What it is:** Minimal chart shown when fewer than 5 data points exist.  
+    - **Purpose:** Allows viewing price even for short date ranges.  
+    - **Tip:** Indicators like MA, BB, MACD, RSI require more data to display correctly.  
+
+    ### **8. CSV Download**
     - **Purpose:** Export historical data for further analysis or backtesting.  
 
     ---
@@ -184,9 +189,11 @@ else:
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["Close"], mode="lines", name="Close"))
                 if show_ma:
-                    fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MA20"], mode="lines", name="MA20"))
-                    fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MA50"], mode="lines", name="MA50"))
-                if show_bb:
+                    if len(filtered_hist) >= 20:
+                        fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MA20"], mode="lines", name="MA20"))
+                    if len(filtered_hist) >= 50:
+                        fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MA50"], mode="lines", name="MA50"))
+                if show_bb and len(filtered_hist) >= 20:
                     fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["BB_Upper"], mode="lines", name="BB Upper", line=dict(dash="dash")))
                     fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["BB_Lower"], mode="lines", name="BB Lower", line=dict(dash="dash")))
                 if show_confluence:
@@ -199,6 +206,27 @@ else:
                 - **Swing Trading:** Use MA20/MA50 bounces and crossovers.  
                 - **Value Investing:** Consider long-term trends and confluence levels.  
                 """)
+
+                # ------------------- One Data Point View -------------------
+                if len(filtered_hist) < 5:
+                    st.write("### Minimal Data Chart (1–4 Points)")
+                    fig_one = go.Figure()
+                    fig_one.add_trace(go.Scatter(
+                        x=filtered_hist.index,
+                        y=filtered_hist["Close"],
+                        mode="markers+text",
+                        text=[f"${val:.2f}" for val in filtered_hist["Close"]],
+                        textposition="top center",
+                        marker=dict(size=12, color="orange"),
+                        name="Close"
+                    ))
+                    fig_one.update_layout(
+                        title="One Data Point / Minimal View",
+                        xaxis_title="Date",
+                        yaxis_title="Close Price"
+                    )
+                    st.plotly_chart(fig_one, use_container_width=True)
+                    st.markdown("ℹ️ Indicators like MA, Bollinger Bands, RSI, and MACD require more data points to display correctly. This minimal chart ensures you can still see price trends.")
 
                 # ------------------- Volume Chart -------------------
                 if show_volume:
@@ -216,49 +244,7 @@ else:
                 # ------------------- RSI Chart -------------------
                 if show_rsi:
                     st.write("### RSI")
-                    fig_rsi = go.Figure()
-                    fig_rsi.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["RSI"], mode="lines", name="RSI"))
-                    fig_rsi.add_hline(y=70, line_dash="dash", line_color="red")
-                    fig_rsi.add_hline(y=30, line_dash="dash", line_color="green")
-                    st.plotly_chart(fig_rsi, use_container_width=True)
-                    st.markdown("""
-                    **Chart Description:**  
-                    - **Day Trading:** Enter/exit when RSI crosses 70/30 zones.  
-                    - **Swing Trading:** Look for divergence to anticipate reversals.  
-                    - **Value Investing:** Oversold RSI may indicate accumulation opportunity.
-                    """)
-
-                # ------------------- MACD Chart -------------------
-                if show_macd:
-                    st.write("### MACD")
-                    fig_macd = go.Figure()
-                    fig_macd.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MACD"], mode="lines", name="MACD"))
-                    fig_macd.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["Signal"], mode="lines", name="Signal"))
-                    st.plotly_chart(fig_macd, use_container_width=True)
-                    st.markdown("""
-                    **Chart Description:**  
-                    - **Day Trading:** MACD line crossing Signal line signals short-term trade.  
-                    - **Swing Trading:** Confirms medium-term trends; divergence signals reversal.  
-                    - **Value Investing:** Trend direction aids long-term buy/sell decisions.
-                    """)
-
-                # ------------------- Summary Metrics -------------------
-                st.write("### Summary Metrics")
-                st.metric("Start Price", f"${filtered_hist['Close'].iloc[0]:.2f}")
-                st.metric("Current Price", f"${filtered_hist['Close'].iloc[-1]:.2f}")
-                st.metric("High", f"${filtered_hist['High'].max():.2f}")
-                st.metric("Low", f"${filtered_hist['Low'].min():.2f}")
-
-                # ------------------- Download CSV -------------------
-                csv = filtered_hist.to_csv().encode("utf-8")
-                st.download_button(
-                    label="⬇️ Download filtered data as CSV",
-                    data=csv,
-                    file_name=f"{ticker_symbol}_historical_filtered.csv",
-                    mime="text/csv",
-                )
-
-            st.write(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-        except Exception as e:
-            st.error(f"Error fetching data: {e}")
+                    if len(filtered_hist) >= 14:
+                        fig_rsi = go.Figure()
+                        fig_rsi.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["RSI"], mode="lines", name="RSI"))
+                        fig_rsi.add_hline(y=
