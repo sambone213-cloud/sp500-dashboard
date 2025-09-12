@@ -242,6 +242,60 @@ else:
                     - **Value Investing:** Trend direction aids long-term buy/sell decisions.
                     """)
 
+                # ------------------- Single-Day Price Chart -------------------
+                st.write("### Single-Day Price Chart")
+                if len(filtered_hist) == 1:
+                    single_day_fig = go.Figure()
+                    single_day_fig.add_trace(go.Scatter(
+                        x=filtered_hist.index,
+                        y=filtered_hist["Close"],
+                        mode="markers+lines",
+                        name="Close",
+                        marker=dict(size=10, color="blue")
+                    ))
+                    if show_ma:
+                        if not pd.isna(filtered_hist["MA20"].iloc[0]):
+                            single_day_fig.add_trace(go.Scatter(
+                                x=filtered_hist.index,
+                                y=filtered_hist["MA20"],
+                                mode="markers",
+                                name="MA20",
+                                marker=dict(size=8, color="orange")
+                            ))
+                        if not pd.isna(filtered_hist["MA50"].iloc[0]):
+                            single_day_fig.add_trace(go.Scatter(
+                                x=filtered_hist.index,
+                                y=filtered_hist["MA50"],
+                                mode="markers",
+                                name="MA50",
+                                marker=dict(size=8, color="green")
+                            ))
+                    if show_bb:
+                        if not pd.isna(filtered_hist["BB_Upper"].iloc[0]):
+                            single_day_fig.add_trace(go.Scatter(
+                                x=filtered_hist.index,
+                                y=filtered_hist["BB_Upper"],
+                                mode="markers",
+                                name="BB Upper",
+                                marker=dict(size=8, color="red")
+                            ))
+                        if not pd.isna(filtered_hist["BB_Lower"].iloc[0]):
+                            single_day_fig.add_trace(go.Scatter(
+                                x=filtered_hist.index,
+                                y=filtered_hist["BB_Lower"],
+                                mode="markers",
+                                name="BB Lower",
+                                marker=dict(size=8, color="purple")
+                            ))
+                    st.plotly_chart(single_day_fig, use_container_width=True)
+                    st.markdown("""
+                    **Chart Description:**  
+                    - Displays a single day's trading data.  
+                    - Useful for analyzing short intraday moves or confirming indicator alignment on a specific day.
+                    """)
+                else:
+                    st.info("Single-Day Price Chart only appears when the filtered data contains exactly one day.")
+
                 # ------------------- Summary Metrics -------------------
                 st.write("### Summary Metrics")
                 st.metric("Start Price", f"${filtered_hist['Close'].iloc[0]:.2f}")
