@@ -67,7 +67,7 @@ if page == "Info":
     Welcome to the S&P 500 Interactive Dashboard! This page explains all the tools and indicators used in the dashboard, with tips for beginners.  
 
     ---
-    
+
     ### **1. Moving Averages (MA20 & MA50)**
     - **What it is:** The average closing price over 20 or 50 days.  
     - **Purpose:** Identify trend direction and potential reversal points.  
@@ -121,7 +121,6 @@ if page == "Info":
     """)
 
 # -----------------------
-# -----------------------
 # Dashboard
 # -----------------------
 else:
@@ -142,14 +141,13 @@ else:
 
             st.write(f"Fetching historical data for: {ticker_symbol}")
 
-            # ----------- NEW: Fetch intraday if single day ----------- #
+            # ----------------------- NEW: Intraday support -----------------------
             if start_date == end_date:
-                # yfinance expects end date > start date, so add one day
                 hist = yf.download(
                     ticker_symbol,
                     start=start_date,
-                    end=start_date + timedelta(days=1),
-                    interval="5m",  # you can adjust to "1m", "15m" etc.
+                    end=start_date + timedelta(days=1),  # yfinance requires end > start
+                    interval="5m"  # Intraday interval: 1m, 5m, 15m, etc.
                 ).dropna()
                 hist.columns = hist.columns.get_level_values(0)
                 if hist.empty:
@@ -158,7 +156,6 @@ else:
                 hist = yf.download(ticker_symbol, start=start_date, end=end_date).dropna()
                 hist.columns = hist.columns.get_level_values(0)
 
-            # Filter data based on selected range
             filtered_hist = hist.loc[start_date:end_date]
 
             if filtered_hist.empty:
@@ -181,7 +178,7 @@ else:
                 show_volume = st.sidebar.checkbox("Show Volume", value=True)
                 show_confluence = st.sidebar.checkbox("Show Confluence Levels", value=True)
 
-                # ------------------- Indicator Calculations -------------------
+                # ------------------- Calculate Indicators -------------------
                 if show_ma:
                     filtered_hist["MA20"] = filtered_hist["Close"].rolling(window=20).mean()
                     filtered_hist["MA50"] = filtered_hist["Close"].rolling(window=50).mean()
@@ -202,7 +199,7 @@ else:
                 fig.add_trace(go.Scatter(
                     x=filtered_hist.index,
                     y=filtered_hist["Close"],
-                    mode="lines" if len(filtered_hist) > 1 else "markers+lines",
+                    mode="lines" if len(filtered_hist) > 1 else "lines+markers",
                     name="Close",
                     marker=dict(size=6)
                 ))
@@ -223,3 +220,48 @@ else:
                         fig.add_hline(y=level, line_dash="dot", line_color="purple", annotation_text=f"Confluence: {level}", annotation_position="top right")
 
                 st.plotly_chart(fig, use_container_width=True)
+
+                # ------------------- Volume Chart -------------------
+                if show_volume:
+                    st.write("### Volume")
+                    fig_vol = go.Figure()
+                    fig_vol.add_trace(go.Bar(x=filtered_hist.index, y=filtered_hist["Volume"], name="Volume"))
+                    st.plotly_chart(fig_vol, use_container_width=True)
+
+                # ------------------- RSI Chart -------------------
+                if show_rsi:
+                    st.write("### RSI")
+                    fig_rsi = go.Figure()
+                    fig_rsi.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["RSI"], mode="lines", name="RSI"))
+                    fig_rsi.add_hline(y=70, line_dash="dash", line_color="red")
+                    fig_rsi.add_hline(y=30, line_dash="dash", line_color="green")
+                    st.plotly_chart(fig_rsi, use_container_width=True)
+
+                # ------------------- MACD Chart -------------------
+                if show_macd:
+                    st.write("### MACD")
+                    fig_macd = go.Figure()
+                    fig_macd.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MACD"], mode="lines", name="MACD"))
+                    fig_macd.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["Signal"], mode="lines", name="Signal"))
+                    st.plotly_chart(fig_macd, use_container_width=True)
+
+                # ------------------- Summary Metrics -------------------
+                st.write("### Summary Metrics")
+                st.metric("Start Price", f"${filtered_hist['Close'].iloc[0]:.2f}")
+                st.metric("Current Price", f"${filtered_hist['Close'].iloc[-1]:.2f}")
+                st.metric("High", f"${filtered_hist['High'].max():.2f}")
+                st.metric("Low", f"${filtered_hist['Low'].min():.2f}")
+
+                # ------------------- Download CSV -------------------
+                csv = filtered_hist.to_csv().encode("utf-8")
+                st.download_button(
+                    label="⬇️ Download filtered data as CSV",
+                    data=csv,
+                    file_name=f"{ticker_symbol}_historical_filtered.csv",
+                    mime="text/csv",
+                )
+
+            st.write(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+        except Exception as e:
+            st.error(f"Error fetching data: {e}")
