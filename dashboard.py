@@ -44,11 +44,9 @@ def calculate_bollinger_bands(data, window=20, num_std=2):
 def get_confluence_levels(hist, show_ma=True, show_bb=True):
     levels = []
     if show_ma:
-        if "MA20" in hist.columns: levels.append(hist["MA20"].iloc[-1])
-        if "MA50" in hist.columns: levels.append(hist["MA50"].iloc[-1])
+        levels += [hist["MA20"].iloc[-1], hist["MA50"].iloc[-1]]
     if show_bb:
-        if "BB_Upper" in hist.columns: levels.append(hist["BB_Upper"].iloc[-1])
-        if "BB_Lower" in hist.columns: levels.append(hist["BB_Lower"].iloc[-1])
+        levels += [hist["BB_Upper"].iloc[-1], hist["BB_Lower"].iloc[-1]]
     levels += [hist['Close'].max(), hist['Close'].min()]
     levels = sorted(list(set([round(x, 2) for x in levels])))
     return levels
@@ -96,21 +94,30 @@ if page == "Info":
     - **Purpose:** Identify trend and momentum.  
     - **Signals & Tips:**  
         - MACD crosses above Signal → bullish, below → bearish.  
+        - Use with volume and confluence for higher confidence.  
 
     ### **5. Volume**
     - **What it is:** Number of shares traded.  
     - **Purpose:** Confirm strength of price moves.  
+    - **Signals & Tips:**  
+        - Rising volume confirms trend; spikes may indicate breakouts or reversals.  
 
     ### **6. Confluence Levels**
-    - **What it is:** Price levels where multiple indicators align.  
+    - **What it is:** Price levels where multiple indicators align (MA, Bollinger Bands, highs/lows).  
     - **Purpose:** Strong support/resistance zones.  
+    - **Signals & Tips:**  
+        - Price reaction likely near these levels; more indicators agreeing → stronger level.  
 
-    ### **7. One Data Point View**
-    - **What it is:** Minimal chart shown when fewer than 5 data points exist.  
-    - **Purpose:** Allows viewing price even for very short date ranges.  
-
-    ### **8. CSV Download**
+    ### **7. CSV Download**
     - **Purpose:** Export historical data for further analysis or backtesting.  
+
+    ---
+    
+    **General Tips for Beginners:**  
+    - Combine multiple indicators for confirmation.  
+    - Check trend on larger timeframes before trading short-term.  
+    - Zoom and interact with charts; toggle indicators to explore patterns.  
+    - Practice on historical data before live trades.
     """)
 
 # -----------------------
@@ -135,6 +142,8 @@ else:
             st.write(f"Fetching historical data for: {ticker_symbol}")
             hist = yf.download(ticker_symbol, start=start_date, end=end_date).dropna()
             hist.columns = hist.columns.get_level_values(0)
+
+            # Filter data based on selected range
             filtered_hist = hist.loc[start_date:end_date]
 
             if filtered_hist.empty:
@@ -142,7 +151,7 @@ else:
             else:
                 st.subheader(selected)
 
-                # Last N days table
+                # ------------------- Last N Days Table -------------------
                 n_days = 10
                 last_n_days = filtered_hist.tail(n_days)
                 st.write(f"### Last {min(n_days, len(filtered_hist))} Days of Historical Prices")
@@ -157,7 +166,7 @@ else:
                 show_volume = st.sidebar.checkbox("Show Volume", value=True)
                 show_confluence = st.sidebar.checkbox("Show Confluence Levels", value=True)
 
-                # Calculate indicators
+                # Calculate indicators on filtered data
                 if show_ma:
                     filtered_hist["MA20"] = filtered_hist["Close"].rolling(window=20).mean()
                     filtered_hist["MA50"] = filtered_hist["Close"].rolling(window=50).mean()
@@ -170,25 +179,19 @@ else:
                 if show_confluence:
                     confluence_levels = get_confluence_levels(filtered_hist, show_ma, show_bb)
 
-                # Price Chart
+                # ------------------- Price Chart -------------------
                 st.write("### Price Chart with Indicators")
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["Close"], mode="lines", name="Close"))
-
                 if show_ma:
-                    if len(filtered_hist) >= 20:
-                        fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MA20"], mode="lines", name="MA20"))
-                    if len(filtered_hist) >= 50:
-                        fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MA50"], mode="lines", name="MA50"))
-
-                if show_bb and len(filtered_hist) >= 20:
+                    fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MA20"], mode="lines", name="MA20"))
+                    fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MA50"], mode="lines", name="MA50"))
+                if show_bb:
                     fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["BB_Upper"], mode="lines", name="BB Upper", line=dict(dash="dash")))
                     fig.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["BB_Lower"], mode="lines", name="BB Lower", line=dict(dash="dash")))
-
                 if show_confluence:
                     for level in confluence_levels:
                         fig.add_hline(y=level, line_dash="dot", line_color="purple", annotation_text=f"Confluence: {level}", annotation_position="top right")
-
                 st.plotly_chart(fig, use_container_width=True)
                 st.markdown("""
                 **Chart Description:**  
@@ -196,27 +199,66 @@ else:
                 - **Swing Trading:** Use MA20/MA50 bounces and crossovers.  
                 - **Value Investing:** Consider long-term trends and confluence levels.  
                 """)
-                
-                # One Data Point View
-                if len(filtered_hist) < 5:
-                    st.write("### Minimal Data Chart (1–4 Points)")
-                    fig_one = go.Figure()
-                    fig_one.add_trace(go.Scatter(
-                        x=filtered_hist.index,
-                        y=filtered_hist["Close"],
-                        mode="markers+text",
-                        text=[f"${val:.2f}" for val in filtered_hist["Close"]],
-                        textposition="top center",
-                        marker=dict(size=12, color="orange"),
-                        name="Close"
-                    ))
-                    fig_one.update_layout(title="One Data Point / Minimal View", xaxis_title="Date", yaxis_title="Close Price")
-                    st.plotly_chart(fig_one, use_container_width=True)
-                    st.markdown("ℹ️ Indicators like MA, Bollinger Bands, RSI, and MACD require more data points. This minimal chart ensures you can still see price trends.")
 
-                # Volume Chart
+                # ------------------- Volume Chart -------------------
                 if show_volume:
                     st.write("### Volume")
                     fig_vol = go.Figure()
                     fig_vol.add_trace(go.Bar(x=filtered_hist.index, y=filtered_hist["Volume"], name="Volume"))
                     st.plotly_chart(fig_vol, use_container_width=True)
+                    st.markdown("""
+                    **Chart Description:**  
+                    - **Day Trading:** Volume spikes indicate breakout/panic moves.  
+                    - **Swing Trading:** Rising volume confirms trend strength.  
+                    - **Value Investing:** Spikes can show institutional buying/selling.
+                    """)
+
+                # ------------------- RSI Chart -------------------
+                if show_rsi:
+                    st.write("### RSI")
+                    fig_rsi = go.Figure()
+                    fig_rsi.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["RSI"], mode="lines", name="RSI"))
+                    fig_rsi.add_hline(y=70, line_dash="dash", line_color="red")
+                    fig_rsi.add_hline(y=30, line_dash="dash", line_color="green")
+                    st.plotly_chart(fig_rsi, use_container_width=True)
+                    st.markdown("""
+                    **Chart Description:**  
+                    - **Day Trading:** Enter/exit when RSI crosses 70/30 zones.  
+                    - **Swing Trading:** Look for divergence to anticipate reversals.  
+                    - **Value Investing:** Oversold RSI may indicate accumulation opportunity.
+                    """)
+
+                # ------------------- MACD Chart -------------------
+                if show_macd:
+                    st.write("### MACD")
+                    fig_macd = go.Figure()
+                    fig_macd.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["MACD"], mode="lines", name="MACD"))
+                    fig_macd.add_trace(go.Scatter(x=filtered_hist.index, y=filtered_hist["Signal"], mode="lines", name="Signal"))
+                    st.plotly_chart(fig_macd, use_container_width=True)
+                    st.markdown("""
+                    **Chart Description:**  
+                    - **Day Trading:** MACD line crossing Signal line signals short-term trade.  
+                    - **Swing Trading:** Confirms medium-term trends; divergence signals reversal.  
+                    - **Value Investing:** Trend direction aids long-term buy/sell decisions.
+                    """)
+
+                # ------------------- Summary Metrics -------------------
+                st.write("### Summary Metrics")
+                st.metric("Start Price", f"${filtered_hist['Close'].iloc[0]:.2f}")
+                st.metric("Current Price", f"${filtered_hist['Close'].iloc[-1]:.2f}")
+                st.metric("High", f"${filtered_hist['High'].max():.2f}")
+                st.metric("Low", f"${filtered_hist['Low'].min():.2f}")
+
+                # ------------------- Download CSV -------------------
+                csv = filtered_hist.to_csv().encode("utf-8")
+                st.download_button(
+                    label="⬇️ Download filtered data as CSV",
+                    data=csv,
+                    file_name=f"{ticker_symbol}_historical_filtered.csv",
+                    mime="text/csv",
+                )
+
+            st.write(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+        except Exception as e:
+            st.error(f"Error fetching data: {e}")
